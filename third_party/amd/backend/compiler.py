@@ -86,9 +86,11 @@ class HIPOptions:
         for lib in ["ocml", "ockl"]:
             extern_libs[lib] = str(default_libdir / f'{lib}.bc')
         rocshmem_device_lib = str(default_libdir / 'librocshmem_device.bc')
+        mori_shmem_device_lib = str(default_libdir / 'libmori_shmem_device.bc')  # Pre-linked wrapper+init BC
 
         object.__setattr__(self, 'extern_libs', tuple(extern_libs.items()))
         object.__setattr__(self, 'rocshmem_device_lib', rocshmem_device_lib)
+        object.__setattr__(self, 'mori_shmem_device_lib', mori_shmem_device_lib)
 
     def hash(self):
         key = '_'.join([f'{name}-{val}' for name, val in self.__dict__.items()])
@@ -150,10 +152,12 @@ class HIPBackend(BaseBackend):
     def get_module_map(self) -> Dict[str, ModuleType]:
         from triton.language.extra.hip import libdevice
         from triton.language.extra.hip import librocshmem_device
+        from triton.language.extra.hip import libmori_shmem_device
 
         return {
-            "triton.language.extra.libdevice": libdevice, "triton_dist.language.extra.libshmem_device":
-            librocshmem_device
+            "triton.language.extra.libdevice": libdevice,
+            "triton_dist.language.extra.libshmem_device": librocshmem_device,
+            "triton_dist.language.extra.libmori_shmem_device": libmori_shmem_device
         }
 
     def load_dialects(self, ctx):
@@ -390,9 +394,14 @@ class HIPBackend(BaseBackend):
         # from memory.
         amd.set_all_fn_arg_inreg(fns[0])
         metadata['use_rocshmem'] = False
+        metadata['use_mori_shmem'] = False
         for k in llvm_mod.get_functions():
             if "rocshmem" in k.name and k.is_declaration():
                 metadata['use_rocshmem'] = True
+            # TODO: rename mori-shmem functions (shmem_my_pe, shmem_n_pes, etc.)
+            if k.is_declaration() and k.name.startswith("shmem_") and "rocshmem" not in k.name:
+                metadata['use_mori_shmem'] = True
+            if metadata['use_rocshmem'] and metadata['use_mori_shmem']:
                 break
 
         if knobs.compilation.enable_asan:
@@ -409,6 +418,10 @@ class HIPBackend(BaseBackend):
 
         if options.rocshmem_device_lib and metadata['use_rocshmem']:
             llvm.link_extern_libs(llvm_mod, [options.rocshmem_device_lib])
+
+        if options.mori_shmem_device_lib and metadata['use_mori_shmem']:
+            # Link unified BC (pre-linked wrapper+init with resolved globalGpuStates)
+            llvm.link_extern_libs(llvm_mod, [options.mori_shmem_device_lib])
 
         llvm.optimize_module(llvm_mod, llvm.OPTIMIZE_O3, options.arch, '', [], options.enable_fp_fusion)
 

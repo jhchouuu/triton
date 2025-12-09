@@ -22,6 +22,33 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 ################################################################################
-from . import libdevice
+from triton.language import core
+import triton.language as tl
+from triton_dist.language.core import extern_call
 
-__all__ = ["libdevice", "librocshmem_device", "libmori_shmem_device"]
+pi_u64_t = tl.core.pointer_type(tl.core.dtype("uint64"))
+pi_i64_t = tl.core.pointer_type(tl.core.dtype("int64"))
+
+
+@core.extern
+def mori_shmem_my_pe(_semantic=None):
+    return extern_call(
+        "libmori_shmem_device",
+        "",
+        [],
+        {(): ("shmem_my_pe", (tl.int32))},
+        is_pure=False,
+        _semantic=_semantic,
+    )
+
+
+@core.extern
+def mori_shmem_n_pes(_semantic=None):
+    return extern_call(
+        "libmori_shmem_device",
+        "",
+        [],
+        {(): ("shmem_n_pes", (tl.int32))},
+        is_pure=True,
+        _semantic=_semantic,
+    )

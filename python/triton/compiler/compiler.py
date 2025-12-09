@@ -497,18 +497,20 @@ class CompiledKernel:
         if self.metadata.num_warps * warp_size > self.n_max_threads:
             raise OutOfResources(self.metadata.num_warps * warp_size, self.n_max_threads, "threads")
 
-        if hasattr(self.metadata, 'use_nvshmem'):
-            if self.metadata.use_nvshmem:
-                # patch function with nvshmem
-                import nvshmem.bindings.nvshmem as pynvshmem
-                pynvshmem.cumodule_init(self.module)
-        elif hasattr(self.metadata, 'use_rocshmem'):
-            if self.metadata.use_rocshmem:
-                pass
-                ## TODO: add pyrocshmem init
-                # import pyrocshmem
+        if hasattr(self.metadata, 'use_nvshmem') and self.metadata.use_nvshmem:
+            # patch function with nvshmem
+            import nvshmem.bindings.nvshmem as pynvshmem
+            pynvshmem.cumodule_init(self.module)
+        elif hasattr(self.metadata, 'use_rocshmem') and self.metadata.use_rocshmem:
+            pass
+            ## TODO: add pyrocshmem init
+            # import pyrocshmem
+        elif hasattr(self.metadata, 'use_mori_shmem') and self.metadata.use_mori_shmem:
+            # Initialize mori_shmem device symbols in this kernel module
+            import mori.shmem as mori_shmem
+            mori_shmem.shmem_module_init(self.module)
         else:
-            print("Warning: No nvshmem/rocshmem imported.")
+            print("Warning: No nvshmem/rocshmem/mori_shmem imported.")
 
     def __getattribute__(self, name):
         if name == 'run':
