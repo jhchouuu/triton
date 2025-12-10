@@ -52,3 +52,21 @@ def mori_shmem_n_pes(_semantic=None):
         is_pure=True,
         _semantic=_semantic,
     )
+
+
+@core.extern
+def mori_shmem_int_p(dest, value, pe, _semantic=None):
+    return extern_call(
+        "libmori_shmem_device",
+        "",
+        [
+            tl.cast(dest, tl.pointer_type(tl.void), _semantic=_semantic),
+            tl.cast(value, tl.int32, _semantic=_semantic),
+            tl.cast(pe, tl.int32, _semantic=_semantic),
+        ],
+        {
+            (tl.pointer_type(tl.void), tl.int32, tl.int32): ("shmem_int_p", ()),
+        },
+        is_pure=False,
+        _semantic=_semantic,
+    )
